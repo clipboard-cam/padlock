@@ -1,0 +1,21 @@
+# Compiled binary
+/padlock
+
+# Go test/build artifacts
+*.test
+*.out
+coverage.out
+
+# Local workflow state (clam-code)
+/.local/
+
+# Local smoke-test scratch
+/inputtest.txt
+*.padlock
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
