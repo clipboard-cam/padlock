@@ -129,3 +129,88 @@ func TestDispatchRecursiveOnFileErrors(t *testing.T) {
 		t.Errorf("expected 'is a file' error, got %v", err)
 	}
 }
+
+func TestRunRecipientsAddFromRawString(t *testing.T) {
+	setupAddressBook(t)
+	pubLine := generateEd25519PubLine(t, "alice@laptop")
+	out := captureStdout(t, func() {
+		if err := run([]string{"recipients", "add", "alice", pubLine}); err != nil {
+			t.Fatalf("run: %v", err)
+		}
+	})
+	if !strings.Contains(out, "Added alice") {
+		t.Errorf("expected 'Added alice', got %q", out)
+	}
+	entries, _ := loadAddressBook()
+	if len(entries) != 1 || entries[0].Name != "alice" {
+		t.Errorf("entries = %+v", entries)
+	}
+}
+
+func TestRunRecipientsAddFromFile(t *testing.T) {
+	setupAddressBook(t)
+	dir := t.TempDir()
+	pubLine := generateEd25519PubLine(t, "bob@desktop")
+	pubPath := filepath.Join(dir, "bob.pub")
+	if err := os.WriteFile(pubPath, []byte(pubLine), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"recipients", "add", "bob", pubPath}); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	entries, _ := loadAddressBook()
+	if len(entries) != 1 || entries[0].Name != "bob" {
+		t.Errorf("entries = %+v", entries)
+	}
+}
+
+func TestRunRecipientsList(t *testing.T) {
+	setupAddressBook(t)
+	pubLine := generateEd25519PubLine(t, "alice@laptop")
+	if err := addAddressBookEntry("alice", pubLine, false); err != nil {
+		t.Fatal(err)
+	}
+	out := captureStdout(t, func() {
+		if err := run([]string{"recipients", "list"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(out, "alice") {
+		t.Errorf("expected to see alice, got %q", out)
+	}
+}
+
+func TestRunRecipientsListEmpty(t *testing.T) {
+	setupAddressBook(t)
+	out := captureStdout(t, func() {
+		if err := run([]string{"recipients"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(out, "No recipients registered") {
+		t.Errorf("expected empty message, got %q", out)
+	}
+}
+
+func TestRunRecipientsRm(t *testing.T) {
+	setupAddressBook(t)
+	pubLine := generateEd25519PubLine(t, "alice")
+	if err := addAddressBookEntry("alice", pubLine, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"recipients", "rm", "alice"}); err != nil {
+		t.Fatalf("rm: %v", err)
+	}
+	entries, _ := loadAddressBook()
+	if len(entries) != 0 {
+		t.Errorf("expected empty after rm, got %+v", entries)
+	}
+}
+
+func TestRunRecipientsUnknownSubcommand(t *testing.T) {
+	setupAddressBook(t)
+	err := run([]string{"recipients", "bogus"})
+	if err == nil || !strings.Contains(err.Error(), "unknown subcommand") {
+		t.Errorf("expected unknown-subcommand error, got %v", err)
+	}
+}

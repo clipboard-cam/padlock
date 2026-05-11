@@ -487,6 +487,48 @@ func TestDecryptOfFileProducesFile(t *testing.T) {
 	}
 }
 
+func TestRoundTripUsingRegisteredName(t *testing.T) {
+	setupAddressBook(t)
+	dir := t.TempDir()
+	alicePriv, _ := generateSSHKeypair(t, dir, "alice")
+	bobPriv, bobPub := generateSSHKeypair(t, t.TempDir(), "bob@laptop")
+
+	bobPubData, err := os.ReadFile(bobPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := addAddressBookEntry("bob", strings.TrimSpace(string(bobPubData)), false); err != nil {
+		t.Fatal(err)
+	}
+
+	src := filepath.Join(dir, "msg.txt")
+	if err := os.WriteFile(src, []byte("hi bob"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	encOut := filepath.Join(dir, "msg.txt.padlock")
+	if err := runEncrypt(encryptOptions{
+		input:        src,
+		recipients:   []string{"bob"},
+		identityPath: alicePriv,
+		outputPath:   encOut,
+	}); err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+
+	decOut := filepath.Join(t.TempDir(), "msg.txt")
+	if err := runDecrypt(decryptOptions{
+		input:        encOut,
+		identityPath: bobPriv,
+		outputPath:   decOut,
+	}); err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	got, _ := os.ReadFile(decOut)
+	if string(got) != "hi bob" {
+		t.Errorf("got %q, want %q", got, "hi bob")
+	}
+}
+
 // When -i is explicit and the matching .pub file is missing, encrypt
 // must error rather than silently dropping the self-recipient — otherwise
 // the user could lock themselves out of their own ciphertext.

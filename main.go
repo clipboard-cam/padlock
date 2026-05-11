@@ -25,6 +25,8 @@ func run(args []string) error {
 		return nil
 	case "pubkey":
 		return runPubkey(args[1:])
+	case "recipients":
+		return runRecipients(args[1:])
 	}
 
 	return runDefault(args)

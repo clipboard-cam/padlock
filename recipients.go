@@ -21,11 +21,32 @@ type recipientInfo struct {
 }
 
 func parseRecipientArg(arg string) (recipientInfo, error) {
-	if strings.HasPrefix(arg, "ssh-") || strings.HasPrefix(arg, "ecdsa-") || strings.HasPrefix(arg, "sk-") {
+	if isSSHKeyPrefix(arg) {
 		return parseSSHRecipient(arg)
+	}
+	// Try the address book before treating the arg as a path. An arg
+	// containing a path separator is unambiguously a path and skips this.
+	hasSep := strings.ContainsRune(arg, os.PathSeparator)
+	if !hasSep {
+		keyLine, found, err := resolveAddressBookKeyLine(arg)
+		if err != nil {
+			return recipientInfo{}, err
+		}
+		if found {
+			r, err := parseSSHRecipient(keyLine)
+			if err != nil {
+				return recipientInfo{}, fmt.Errorf("recipient %q: %w", arg, err)
+			}
+			// Prefer the registered name over the key comment for clarity.
+			r.Label = arg
+			return r, nil
+		}
 	}
 	data, err := os.ReadFile(arg)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) && !hasSep {
+			return recipientInfo{}, fmt.Errorf("no recipient named %q (try `padlock recipients list`)", arg)
+		}
 		return recipientInfo{}, fmt.Errorf("read recipient %q: %w", arg, err)
 	}
 	return parseSSHRecipient(string(data))
